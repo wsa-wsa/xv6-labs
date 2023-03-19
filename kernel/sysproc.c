@@ -75,6 +75,31 @@ int
 sys_pgaccess(void)
 {
   // lab pgtbl: your code here.
+  uint64 va;
+  int n;
+  uint64 abits;
+  argaddr(0, &va);
+  argint(1, &n);
+  argaddr(2, &abits);
+  uint64 mask = 0;
+  if(va >= MAXVA)
+    panic("pgaccess");
+  pagetable_t pagetable = myproc()->pagetable;
+  for(int level = 2; level > 0; level--) {
+    pte_t *pte = &pagetable[PX(level, va)];
+    if(*pte & PTE_V) {
+      pagetable = (pagetable_t)PTE2PA(*pte);
+    }
+  }
+  int index = PX(0, va);
+  for(int i=1; i<=n&&(index+i)<512; i++){
+    pte_t pte = pagetable[index+i];
+    if(pte & PTE_A){
+      mask |= (1<<i);
+    }
+  }
+  if(copyout(myproc()->pagetable, abits, (char*)&mask, sizeof(abits)))
+    return -1;
   return 0;
 }
 #endif
