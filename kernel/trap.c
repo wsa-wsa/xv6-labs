@@ -46,7 +46,7 @@ usertrap(void)
   w_stvec((uint64)kernelvec);
 
   struct proc *p = myproc();
-  
+
   // save user program counter.
   p->trapframe->epc = r_sepc();
   
@@ -77,8 +77,17 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if(which_dev == 2){
+    // 更改陷阱帧中保留的程序计数器
+    if(p->interval!=0&&++p->nticks <= p->interval&&p->is_alarming==0){
+      // w_sepc((uint64)p->handler);
+      memmove(p->alarm_trapframe, p->trapframe, sizeof(struct trapframe));
+      p->trapframe->epc = (uint64)p->handler;
+      p->nticks = 0;
+      p->is_alarming=1;
+    }
     yield();
+  }
 
   usertrapret();
 }

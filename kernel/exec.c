@@ -74,7 +74,8 @@ exec(char *path, char **argv)
 
   p = myproc();
   uint64 oldsz = p->sz;
-
+  p->elf = (struct elfhdr*)ph.vaddr;
+  // p->elf = &elf;
   // Allocate two pages at the next page boundary.
   // Make the first inaccessible as a stack guard.
   // Use the second as the user stack.
@@ -119,7 +120,7 @@ exec(char *path, char **argv)
     if(*s == '/')
       last = s+1;
   safestrcpy(p->name, last, sizeof(p->name));
-    
+  // p->elfhdr = elf;
   // Commit to the user image.
   oldpagetable = p->pagetable;
   p->pagetable = pagetable;

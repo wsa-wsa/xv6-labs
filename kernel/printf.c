@@ -118,6 +118,7 @@ printf(char *fmt, ...)
 void
 panic(char *s)
 {
+  backtrace();
   pr.locking = 0;
   printf("panic: ");
   printf(s);
@@ -132,4 +133,17 @@ printfinit(void)
 {
   initlock(&pr.lock, "pr");
   pr.locking = 1;
+}
+
+void
+backtrace(void)
+{
+  printf("elf: %p\n", myproc()->elf);
+  printf("backtrace:\n");
+  uint64 fp = r_fp();
+  while(PGROUNDUP(fp)-PGROUNDDOWN(fp)==PGSIZE){
+    uint64 ret_addr = *(uint64*)(fp - 8);
+    printf("%p\n", ret_addr);
+    fp = *(uint64*)(fp - 16);
+  }
 }
