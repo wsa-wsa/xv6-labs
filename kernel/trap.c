@@ -68,9 +68,24 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
-    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-    setkilled(p);
+      if(r_scause()==15||r_scause()==13){
+        uint64 fault_va = r_stval();  // 获取出错的虚拟地址
+        if(fault_va >= p->sz
+          || cowpage(p->pagetable, fault_va) != 0
+          || cowalloc(p->pagetable, PGROUNDDOWN(fault_va)) == 0)
+          p->killed = 1;
+      }
+      else if(r_scause()==12){
+        printf("pc: %p\n", r_sepc());
+        printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+        printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+        setkilled(p);
+      }
+      else{
+        printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+        printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+        setkilled(p);
+      }
   }
 
   if(killed(p))
