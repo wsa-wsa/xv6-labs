@@ -16,6 +16,7 @@ struct entry {
 struct entry *table[NBUCKET];
 int keys[NKEYS];
 int nthread = 1;
+pthread_mutex_t lock; // declare a lock
 
 
 double
@@ -47,12 +48,17 @@ void put(int key, int value)
     if (e->key == key)
       break;
   }
+
   if(e){
     // update the existing key.
+    pthread_mutex_lock(&lock);
     e->value = value;
+    pthread_mutex_unlock(&lock);
   } else {
     // the new is new.
+    pthread_mutex_lock(&lock);
     insert(key, value, &table[i], table[i]);
+    pthread_mutex_unlock(&lock);
   }
 
 }
@@ -91,7 +97,9 @@ get_thread(void *xa)
   int missing = 0;
 
   for (int i = 0; i < NKEYS; i++) {
+    // pthread_mutex_lock(&lock);
     struct entry *e = get(keys[i]);
+    // pthread_mutex_lock(&lock);
     if (e == 0) missing++;
   }
   printf("%d: %d keys missing\n", n, missing);
@@ -104,7 +112,7 @@ main(int argc, char *argv[])
   pthread_t *tha;
   void *value;
   double t1, t0;
-
+  pthread_mutex_init(&lock, NULL); // initialize the lock
 
   if (argc < 2) {
     fprintf(stderr, "Usage: %s nthreads\n", argv[0]);
