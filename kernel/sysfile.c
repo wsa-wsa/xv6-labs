@@ -15,7 +15,7 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
-
+#define MAX_SYMLINK_DEPTH 10
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -328,6 +328,35 @@ sys_open(void)
       return -1;
     }
     ilock(ip);
+    // 处理符号链接
+    if(ip->type == T_SYMLINK && !(omode & O_NOFOLLOW)) {
+      // 若符号链接指向的仍然是符号链接，则递归的跟随它
+      // 直到找到真正指向的文件
+      // 但深度不能超过MAX_SYMLINK_DEPTH
+      for(int i = 0; i < MAX_SYMLINK_DEPTH; ++i) {
+        // 读出符号链接指向的路径
+        if(readi(ip, 0, (uint64)path, 0, MAXPATH) != MAXPATH) {
+          iunlockput(ip);
+          end_op();
+          return -1;
+        }
+        iunlockput(ip);
+        ip = namei(path);
+        if(ip == 0) {
+          end_op();
+          return -1;
+        }
+        ilock(ip);
+        if(ip->type != T_SYMLINK)
+          break;
+      }
+      // 超过最大允许深度后仍然为符号链接，则返回错误
+      if(ip->type == T_SYMLINK) {
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+    }
     if(ip->type == T_DIR && omode != O_RDONLY){
       iunlockput(ip);
       end_op();
@@ -501,5 +530,34 @@ sys_pipe(void)
     fileclose(wf);
     return -1;
   }
+  return 0;
+}
+
+uint64
+sys_symlink(void)
+{
+  // struct file *f;
+  struct inode *ip;
+  char target[MAXPATH], path[MAXPATH];
+  if(argstr(0, target, MAXPATH) < 0) {
+    return -1;
+  }
+  if(argstr(1, path, MAXPATH) < 0) {
+    return -1;
+  }
+  
+  begin_op();
+  ip = create(path, T_SYMLINK, 0, 0);
+  if(ip == 0){
+    end_op();
+    return -1;
+  }
+  ip->size = 0;
+  writei(ip, 0, (uint64)target, 0, MAXPATH);
+  iunlockput(ip);
+  end_op();
+
+  // printf("target:%s path:%s\n", target, path);
+
   return 0;
 }
