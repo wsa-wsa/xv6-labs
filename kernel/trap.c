@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -49,8 +50,8 @@ usertrap(void)
   
   // save user program counter.
   p->trapframe->epc = r_sepc();
-  
-  if(r_scause() == 8){
+  int scause = r_scause();
+  if(scause == 8){
     // system call
 
     if(killed(p))
@@ -67,6 +68,15 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
+  } else if(scause == 13 || scause == 15) {
+#ifdef LAB_MMAP
+    // 读取产生页面故障的虚拟地址，并判断是否位于有效区间
+    uint64 fault_va = r_stval();
+    if(PGROUNDUP(p->trapframe->sp) - 1 < fault_va && fault_va < p->sz) {
+        if(mmap_handler(r_stval(), scause) != 0) p->killed = 1;
+    } else
+        p->killed = 1;
+#endif
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
